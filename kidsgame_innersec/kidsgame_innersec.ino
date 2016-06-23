@@ -1,5 +1,5 @@
 /*
-   Q&A Framework Code
+   Inner Security Code
    by: Valerie May Tomic
    Escape Rhode Island
    6/21/16
@@ -7,8 +7,6 @@
    The code for the inner security system in the
    bowling alley kids game. Based on the
    QA_abc_Framework.
-
-   Hardware: fill in later
 */
 
 //include touchpad library code:
@@ -19,7 +17,11 @@
 #define MPR121_R 0xB5  // ADD pin is grounded
 #define MPR121_W 0xB4 // So address is 0x5A
 int irqpin = 7;  // D7
+
+// Other pins
+int ledpin = 6; //DC6
 int maglockpin = 13; //D13
+
 uint16_t touchstatus;
 
 // include the lcd library code:
@@ -31,13 +33,6 @@ LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 //include user Q/A information:
 #include "mydata.h"
 
-//global declarations because timers ugh
-//boolean done = false;
-//String response ="";
-//int pressCount = 0;
-//int prevKey = -1;
-//int qRows;
-
 void setup() {
   //interupt pin init
   pinMode(irqpin, INPUT);
@@ -46,6 +41,10 @@ void setup() {
   //maglock pin init
   pinMode(maglockpin, OUTPUT);
   digitalWrite(maglockpin, HIGH);
+  
+  //led pin init
+  pinMode(ledpin, OUTPUT);
+  digitalWrite(ledpin, HIGH);
 
   //i2c and lcd init
   Serial.begin(9600);
@@ -55,16 +54,26 @@ void setup() {
   lcd.begin(20, 4);
   delay(100);
   mpr121QuickConfig();
-  lcd.print("Welcome to QA!");
-  //lcd.blink();
-  delay(1000);
+  //Optional welome message
+  //lcd.print("Welcome to QA!");
+  //delay(1000);
   lcd.clear();
 }
 
 void loop() {
+ //clear lcd and lock maglock
+  lcd.clear();
+  digitalWrite(maglockpin, HIGH);
+
+  //run QA repl
   int num_correct = QArepl();
   endGame(num_correct);
-  exit(0);
+
+  //Wait 5 mins, then reset
+  for(int i=0;i<10;i++){
+  unsigned long endtime = millis();
+  while(abs(millis()-endtime) < 30*1000); 
+  }
 }
 
 /*
@@ -79,10 +88,13 @@ int QArepl() {
       correct++;
     }
   }
-  Serial.println(correct);
   return correct;
 }
 
+/*
+ * Checks the length of the question being asked, and
+ * returns the number of rows it will take up.
+ */
 int askQ(String question){
  printQuestion(question+":");
  if(question.length() < 20)
@@ -93,6 +105,10 @@ int askQ(String question){
    return 3;//Question will be cut down to three lines if longer
 }
 
+/*
+ * Waits for touchpad input, looping on the same question until
+ * the enter is pressed. Returns the user's response as a string
+ */
 String getResponse(int qRows) {
   String response = "";
   boolean entered = false;
@@ -101,9 +117,16 @@ String getResponse(int qRows) {
   lcd.setCursor(0,qRows);
   while(!entered)
   {
-    while(checkInterrupt() && (newKey == -1));
-    Serial.println("newkey = ");
-    Serial.println(newKey);
+    unsigned long curr_time = millis();
+    while(checkInterrupt() && (newKey == -1)){
+      if(abs(millis() - curr_time) > 30*1000){
+        digitalWrite(ledpin, LOW);
+      }
+      else{
+        digitalWrite(ledpin, HIGH);
+      }
+    }
+    digitalWrite(ledpin, HIGH);
     touchNumber = 0;
     
     touchstatus = mpr121Read(0x01) << 8;
@@ -157,6 +180,12 @@ String getResponse(int qRows) {
   return response;
 }
 
+/*
+ * A function waiting for touchpad input
+ * after a key has been pressed. An int is
+ * returned representing a new key press,
+ * or -1 if the key press times out.
+ */
 int keyPressed(String &response, int prevKey, int pressCount, int qRows){
   confirm(response, prevKey, pressCount);
   printResponse(response, qRows);
@@ -171,11 +200,9 @@ int keyPressed(String &response, int prevKey, int pressCount, int qRows){
     touchstatus |= mpr121Read(0x00);
     
     if ((millis() - cur_time) > 1200){
-      Serial.println("TIMEOUT");
       return -1;
     }
     
-    Serial.println("PRESS DETECTED");
     int touchNumber = 0; 
     touchstatus = mpr121Read(0x01) << 8;
     touchstatus |= mpr121Read(0x00);
@@ -214,25 +241,19 @@ int keyPressed(String &response, int prevKey, int pressCount, int qRows){
     }
   }
   if(cur_key == prevKey){
-    Serial.println("MULTIPRESS");
     deleteLast(response, qRows);
     keyPressed(response, cur_key, pressCount+1, qRows);
   }
   else{
-    Serial.println("NEWPRESS");
-    Serial.println("cur_key =");
-    Serial.println(cur_key);
-    //deleteLast(response, qRows);
-    //confirm(response, prevKey, pressCount);
     return cur_key;
   }
 }
 
+/* A function which adds the appropriate character to the
+ *  response string depending on which key has been
+ *  pressed how many times.
+ */
 void confirm(String &response, int key, int pressCount){
-  Serial.println("CONFIRMING");
-  Serial.println(key);
-  Serial.println("pressCount=");
-  Serial.println(pressCount);
   if (key == PQRS){
     switch(pressCount%4){
       case 1:
@@ -345,10 +366,11 @@ void confirm(String &response, int key, int pressCount){
         break;
     }
   }
-  
-  Serial.println("CONFIRMED");
 }
 
+/*
+ * Removes the final character from the response string
+ */
 void deleteLast(String &response, int qRows){
   int len = response.length();
   if (len > 0 && len <= 20){
@@ -368,6 +390,13 @@ void deleteLast(String &response, int qRows){
   }
 }
 
+/*
+ * A function that prints the response string
+ * with proper word wrapping for 20x4 display,
+ * cutting off any letters entered outside the
+ * range of the display and returning the
+ * response string.
+ */
 String printResponse(String response, int qRows){
   int rowLimit = 4 - qRows;
   int len = response.length();
@@ -403,7 +432,12 @@ String printResponse(String response, int qRows){
      }
 }
 
-
+/*
+ * Prints the question with proper word
+ * wrapping for a 20x4 display. Any
+ * questions longer than 3 lines are cut
+ * down.
+ */
 void printQuestion(String question){
   int len = question.length();
      if(len <= 20){
@@ -445,9 +479,7 @@ void printQuestion(String question){
 
 //endGame function
 void endGame(int correct) {
-  lcd.noBlink();
   if (correct == NUMQ){
-    Serial.println("WIN");
     lcd.print("You win!");
     delay(1000);
     lcd.setCursor(0,2);
@@ -455,7 +487,6 @@ void endGame(int correct) {
     digitalWrite(maglockpin, LOW);
   }
   else{
-    Serial.println("LOSE");
     String response = "You got ";
     response.concat(correct);//lol ASCII
     response.concat(" of ");
@@ -579,7 +610,6 @@ void mpr121QuickConfig(void) {
 }
 
 byte checkInterrupt(void){
-  //Serial.println("checking pad");
   if (digitalRead(irqpin)) {
     return 1;
   }

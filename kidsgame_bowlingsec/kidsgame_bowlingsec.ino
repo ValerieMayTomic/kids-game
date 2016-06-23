@@ -1,8 +1,8 @@
 /*
-   Q&A Framework Code
+   Outer Bowling Security Code
    by: Valerie May Tomic
    Escape Rhode Island
-   6/21/16
+   6/23/16
 
    Code for the outer security system in the bowling
    alley kids game. Based on QA_Framework.
@@ -52,23 +52,25 @@ void setup() {
   lcd.begin(20, 4);
   delay(100);
   mpr121QuickConfig();
-  lcd.print("Welcome to QA!");
-  delay(1000);
+  //Optional welcome message
+  //lcd.print("Welcome to QA!");
+ // delay(1000);
 }
 
 void loop() {
+  //clear lcd and lock maglock
   lcd.clear();
   digitalWrite(maglockpin, HIGH);
-  Serial.println(NUMQ);
+
+  //run QA repl
   int num_correct = QArepl();
   endGame(num_correct);
+
+  //Wait 5 mins, then reset
   for(int i=0;i<10;i++){
   unsigned long endtime = millis();
-    while(abs(millis()-endtime) < 30*1000){
-      Serial.println(abs(millis()-endtime)); 
-    }
+  while(abs(millis()-endtime) < 30*1000); 
   }
-  Serial.println("WTFWTFWTFWTFWTFWTFWTFWTFWTFWTFWTFWTFWTFWTFW");
 }
 
 /*
@@ -83,10 +85,13 @@ int QArepl() {
       correct++;
     }
   }
-  Serial.println(correct);
   return correct;
 }
 
+/*
+ * Checks the length of the question being asked, and
+ * returns the number of rows it will take up.
+ */
 int askQ(String question){
  printQuestion(question+":");
  if(question.length() < 20)
@@ -97,6 +102,10 @@ int askQ(String question){
    return 3;//Question will be cut down to three lines if longer
 }
 
+/*
+ * Waits for touchpad input, looping on the same question until
+ * the enter is pressed. Returns the user's response as a string
+ */
 String getResponse(int qRows) {
   String response = "";
   boolean entered = false;
@@ -175,6 +184,13 @@ String getResponse(int qRows) {
   return response;
 }
 
+/*
+ * A function that prints the response string
+ * with proper word wrapping for 20x4 display,
+ * cutting off any letters entered outside the
+ * range of the display and returning the
+ * response string.
+ */
 String printResponse(String response, int qRows){
   int rowLimit = 4 - qRows;
   int len = response.length();
@@ -210,7 +226,12 @@ String printResponse(String response, int qRows){
      }
 }
 
-
+/*
+ * Prints the question with proper word
+ * wrapping for a 20x4 display. Any
+ * questions longer than 3 lines are cut
+ * down.
+ */
 void printQuestion(String question){
   int len = question.length();
      if(len <= 20){
@@ -252,19 +273,14 @@ void printQuestion(String question){
 
 //endGame function
 void endGame(int correct) {
-  lcd.noBlink();
   if (correct == NUMQ){
-    Serial.println("WIN");
     lcd.print("You win!");
     delay(1000);
     lcd.setCursor(0,2);
     lcd.print("System unlocking...");
     digitalWrite(maglockpin, LOW);
-    //delay(2000);
-    //digitalWrite(ledpin, LOW);
   }
   else{
-    Serial.println("LOSE");
     String response = "You got ";
     response.concat(correct);
     response.concat(" of ");
