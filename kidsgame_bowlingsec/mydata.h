@@ -1,13 +1,13 @@
 // Question and Answer arrays
-const String q_array[] {"Question 1?", \
-                "Question 2 is a two line long question?", \
-                "Question 3 is way longer at three whole lines long?", \
-                "Question 4 is so long that it actually needs to be cutoff a bit to be three lines?"};
+const String q_array[] {"How many pins are upin a new frame?", \
+                "Which pin begins    closest to the      bowler?", \
+                "In which frame can  you bowl more than  one strike?", \
+                "You bowl 1,9,10,5,3.What is the score inthe third frame?"};
 #define NUMQ sizeof(q_array)/6
-const String a_array[] {"1", \
-                "2", \
-                "3", \
-                "4"};
+const String a_array[] {"10", \
+                "1", \
+                "10", \
+                "46"};
                 
 // Match key inputs with electrode numbers
 // Default: Number pad format

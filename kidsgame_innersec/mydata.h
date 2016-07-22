@@ -1,13 +1,11 @@
 // Question and Answer arrays
-const String q_array[] {"Question 1?", \
-                "Question 2 is a two line long question?", \
-                "Question 3 is way longer at three whole lines long?", \
-                "Question 4 is so long that it actually needs to be cutoff a bit to be three lines?"};
+const String q_array[] {"What is the sacred  time of all bowling alley sabateurs?", \
+                "What company makes  our spy equipment?", \
+                "What is the name of our master?"};
 #define NUMQ sizeof(q_array)/6
-const String a_array[] {"one", \
-                "two", \
-                "three", \
-                "four"};
+const String a_array[] {"seven ten", \
+                "acme", \
+                "doctor lucius graves"};
                 
 // Match key inputs with electrode numbers
 // Default: Number pad format

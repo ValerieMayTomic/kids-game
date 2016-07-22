@@ -13,14 +13,22 @@
 #include "mpr121.h"
 #include "i2c.h"
 
+//include adc libraries:
+#include <Wire.h>
+#include "Adafruit_ADS1015.h"
+
 //Touchpad globals
 #define MPR121_R 0xB5  // ADD pin is grounded
 #define MPR121_W 0xB4 // So address is 0x5A
 int irqpin = 7;  // D7
 
+//adc globals
+Adafruit_ADS1015 ads1;   
+Adafruit_ADS1015 ads2(0x49);
+
 // Other pins
 int ledpin = 6; //DC6
-int maglockpin = 13; //D13
+//int maglockpin = 13; //D13
 
 uint16_t touchstatus;
 
@@ -39,14 +47,14 @@ void setup() {
   digitalWrite(irqpin, HIGH);
 
   //maglock pin init
-  pinMode(maglockpin, OUTPUT);
-  digitalWrite(maglockpin, HIGH);
+  //pinMode(maglockpin, OUTPUT);
+  //digitalWrite(maglockpin, HIGH);
   
   //led pin init
   pinMode(ledpin, OUTPUT);
   digitalWrite(ledpin, HIGH);
 
-  //i2c and lcd init
+  //i2c touch and lcd init
   Serial.begin(9600);
   DDRC |= 0b00010011;
   PORTC = 0b00110000;  // Pull-ups on I2C Bus
@@ -54,25 +62,32 @@ void setup() {
   lcd.begin(20, 4);
   delay(100);
   mpr121QuickConfig();
-  //Optional welome message
-  //lcd.print("Welcome to QA!");
-  //delay(1000);
   lcd.clear();
+
+  //adac init
+   ads1.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V 1 bit = 2mV      0.125mV
+   ads2.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
 }
 
 void loop() {
  //clear lcd and lock maglock
   lcd.clear();
-  digitalWrite(maglockpin, HIGH);
+  //reset i2c  for touchpad
+  i2cInit();
+  delay(100);
+  mpr121QuickConfig();
+  //digitalWrite(maglockpin, HIGH);
 
   //run QA repl
   int num_correct = QArepl();
   endGame(num_correct);
 
   //Wait 5 mins, then reset
-  for(int i=0;i<10;i++){
+  /////change back to 5 mins!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  for(int i=0;i<2;i++){
   unsigned long endtime = millis();
   while(abs(millis()-endtime) < 30*1000); 
+  Serial.println("resetting");
   }
 }
 
@@ -480,15 +495,19 @@ void printQuestion(String question){
 //endGame function
 void endGame(int correct) {
   if (correct == NUMQ){
+    ads1.begin();
+    ads2.begin();
     lcd.print("You win!");
     delay(1000);
     lcd.setCursor(0,2);
-    lcd.print("System unlocking...");
-    digitalWrite(maglockpin, LOW);
+    lcd.print("Code: BOLD");
+    delay(5000);
+//digitalWrite(maglockpin, LOW); 
+  adcLoop();
   }
   else{
     String response = "You got ";
-    response.concat(correct);//lol ASCII
+    response.concat(correct);
     response.concat(" of ");
     response.concat(NUMQ);
     response.concat("!");
@@ -500,6 +519,60 @@ void endGame(int correct) {
     lcd.clear();
     endGame(QArepl());
  }
+}
+
+void adcLoop(){
+  int16_t adc10, adc11, adc12, adc13, adc20, adc21, adc22, adc23;
+  int counter = 0;
+  lcd.clear();
+  lcd.print("CAUTION!");
+  lcd.setCursor(0,2);
+  delay(500);
+  lcd.print("SYSTEM ARMED!!");
+  boolean armed = true;
+  
+  while(armed){
+    adc11 = ads1.readADC_SingleEnded(1);
+    adc12 = ads1.readADC_SingleEnded(2);
+    adc13 = ads1.readADC_SingleEnded(3);
+    
+    Serial.print("AIN11: "); Serial.println(adc11);
+    Serial.print("AIN12: "); Serial.println(adc12);
+    Serial.print("AIN13: "); Serial.println(adc13);
+    
+    adc20 = ads2.readADC_SingleEnded(0);
+    adc21 = ads2.readADC_SingleEnded(1);
+    adc22 = ads2.readADC_SingleEnded(2);
+    adc23 = ads2.readADC_SingleEnded(3);
+    Serial.print("AIN20: "); Serial.println(adc20);
+    Serial.print("AIN21: "); Serial.println(adc21);
+    Serial.print("AIN22: "); Serial.println(adc22);
+    Serial.print("AIN23: "); Serial.println(adc23);
+  
+    if((adc21 >= 80 && adc21 <= 250) && (adc20 >=280 && adc20 <= 450)&&(adc23 >=500&& adc23 <= 700) && (adc12 >=700&& adc12 <= 980) && (adc11 >=980&& adc11 <=1200) && (adc13 >=1200&& adc13 <= 1450)&&(adc22 >=1450&& adc22 <= 1700)){
+      if(counter == 10){
+        armed = false;
+        for(int i=0; i<60;i++){
+          lcd.clear();
+          lcd.print("SUCCESS!!!!!");
+          lcd.setCursor(0,2);
+          delay(500);
+          lcd.print("SYSTEM DISARMED!!!!");
+          delay(500);
+        }
+      }
+      else{
+        Serial.println("CORRECT");
+        counter++;
+      }
+    } 
+    else{
+      Serial.println("INCORRECT");
+      counter = 0;
+    }
+    Serial.println(counter);
+    delay(200);
+  }
 }
 
 //TOUCHPAD FUNCTIONS
